@@ -1,291 +1,541 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Realtime Chat</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spider-Chat</title>
   <script src="/socket.io/socket.io.js"></script>
 
   <style>
+    :root {
+      --spidey-red: #d71921;
+      --spidey-red-dark: #8e1016;
+      --spidey-blue: #1a4c9c;
+      --spidey-blue-dark: #0a1f4a;
+      --spidey-black: #080c16;
+      --spidey-white: #f3f7ff;
+      --line-color: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
-      background: #210635;
-      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--spidey-white);
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, #05070e 0%, #0a1a42 48%, #8e1016 100%);
+      overflow: hidden;
+      position: relative;
+      isolation: isolate;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(118deg, rgba(8, 12, 22, 0.78) 10%, rgba(10, 31, 74, 0.4) 45%, rgba(142, 16, 22, 0.32) 100%),
+        url("/marvels-spider-man-2880x1800-11990.jpeg");
+      background-size: auto, cover;
+      background-position: center, center 24%;
+      animation: bg-pan 22s ease-in-out infinite alternate;
+      transform-origin: center;
+      z-index: -2;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 82% 18%, rgba(215, 25, 33, 0.32), rgba(215, 25, 33, 0) 36%),
+        radial-gradient(circle at 20% 78%, rgba(26, 76, 156, 0.34), rgba(26, 76, 156, 0) 42%),
+        linear-gradient(145deg, rgba(8, 12, 22, 0.52), rgba(8, 12, 22, 0.82)),
+        repeating-radial-gradient(circle at center, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 34px),
+        linear-gradient(90deg, transparent 0 49.5%, rgba(255, 255, 255, 0.04) 50%, transparent 50.5%);
+      background-size: auto, auto, auto, auto, auto;
+      background-position: center, center, center, center, center;
+      background-blend-mode: screen, screen, normal, normal, normal;
+      animation: bg-pan-alt 30s ease-in-out infinite alternate, web-float 12s ease-in-out infinite;
+      opacity: 0.62;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @keyframes bg-pan {
+      0% {
+        transform: scale(1.03) translate3d(-1.2%, -0.8%, 0);
+        filter: saturate(1.05) brightness(0.92);
+      }
+      50% {
+        transform: scale(1.07) translate3d(1.5%, -1.2%, 0);
+        filter: saturate(1.1) brightness(0.98);
+      }
+      100% {
+        transform: scale(1.04) translate3d(-0.8%, 1.2%, 0);
+        filter: saturate(1.06) brightness(0.95);
+      }
+    }
+
+    @keyframes web-float {
+      0%,
+      100% {
+        opacity: 0.62;
+        transform: translateY(0px);
+      }
+      50% {
+        opacity: 0.82;
+        transform: translateY(-8px);
+      }
+    }
+
+    @keyframes bg-pan-alt {
+      0% {
+        transform: scale(1.08) translate3d(1.4%, -1.4%, 0);
+        filter: saturate(0.95) contrast(1.06);
+      }
+      50% {
+        transform: scale(1.04) translate3d(-1.2%, 0.9%, 0);
+        filter: saturate(1.02) contrast(1.03);
+      }
+      100% {
+        transform: scale(1.09) translate3d(0.9%, 1.6%, 0);
+        filter: saturate(0.98) contrast(1.08);
+      }
+    }
+
+    .username-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 6, 12, 0.88);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      color: white;
+      z-index: 20;
+      padding: 20px;
     }
 
-    .chat-container {
-      width: 440px;
-      height: 600px;
-      background: #420D4B;
-      border-radius: 20px;
-      box-shadow: 0 12px 35px rgba(0,0,0,0.5);
-      display: flex;
-      flex-direction: column;
+    .modal-card {
+      width: min(460px, 100%);
+      background: linear-gradient(160deg, rgba(10, 31, 74, 0.95), rgba(142, 16, 22, 0.95));
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+
+    .modal-card h2 {
+      margin: 0 0 8px;
+      font-size: 1.6rem;
+      letter-spacing: 0.2px;
+    }
+
+    .modal-card p {
+      margin: 0 0 18px;
+      color: rgba(244, 248, 255, 0.8);
+      font-size: 0.95rem;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(8, 20, 52, 0.72);
+      color: var(--spidey-white);
+      outline: none;
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    .modal-input::placeholder {
+      color: rgba(244, 248, 255, 0.6);
+    }
+
+    .join-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, var(--spidey-red), var(--spidey-red-dark));
+      color: var(--spidey-white);
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    .join-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .chat-shell {
+      width: min(920px, 96vw);
+      height: min(88vh, 760px);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
       overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto auto;
+      background: rgba(7, 11, 20, 0.66);
+      -webkit-backdrop-filter: blur(7px);
+      backdrop-filter: blur(7px);
+      box-shadow: 0 28px 65px rgba(0, 0, 0, 0.55);
+      position: relative;
+      z-index: 2;
     }
 
     .header {
-      padding: 15px;
-      background: #7B337E;
+      padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-weight: bold;
+      background: linear-gradient(90deg, rgba(142, 16, 22, 0.9), rgba(18, 58, 122, 0.9));
+      border-bottom: 1px solid var(--line-color);
+    }
+
+    .title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.4px;
+      font-weight: 800;
+    }
+
+    .title-wrap span {
+      font-size: 0.8rem;
+      color: rgba(244, 248, 255, 0.78);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: rgba(244, 248, 255, 0.8);
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 11px;
+      height: 11px;
       border-radius: 50%;
-      background: red;
+      background: #ca1d27;
+      box-shadow: 0 0 12px rgba(215, 25, 33, 0.55);
+      transition: background 0.25s ease;
     }
 
     .messages {
-      flex: 1;
-      padding: 15px;
+      padding: 20px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      background:
+        linear-gradient(130deg, rgba(8, 12, 22, 0.74), rgba(8, 12, 22, 0.58)),
+        url("/thumb-1920-912442.jpg");
+      background-size: auto, cover;
+      background-position: center, center;
+      background-blend-mode: normal, luminosity;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: rgba(215, 25, 33, 0.72);
+      border-radius: 20px;
     }
 
     .message {
-      max-width: 70%;
-      padding: 10px 15px;
-      border-radius: 18px;
-      font-size: 14px;
-      word-wrap: break-word;
+      max-width: 72%;
+      border-radius: 16px;
+      padding: 12px 14px;
+      line-height: 1.4;
+      font-size: 0.94rem;
+      word-break: break-word;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
     }
 
-    .sent {
+    .message strong {
+      font-size: 0.78rem;
+      opacity: 0.9;
+      letter-spacing: 0.2px;
+    }
+
+    .message.sent {
       align-self: flex-end;
-      background: #7B337E;
+      background: linear-gradient(140deg, rgba(215, 25, 33, 0.93), rgba(142, 16, 22, 0.96));
+      border-bottom-right-radius: 6px;
     }
 
-    .received {
+    .message.received {
       align-self: flex-start;
-      background: #6667AB;
+      background: linear-gradient(140deg, rgba(26, 76, 156, 0.9), rgba(10, 31, 74, 0.95));
+      border-bottom-left-radius: 6px;
     }
 
     .timestamp {
-      font-size: 10px;
-      margin-top: 5px;
-      opacity: 0.7;
+      font-size: 0.7rem;
+      margin-top: 7px;
       text-align: right;
+      color: rgba(244, 248, 255, 0.74);
     }
 
     .system {
       align-self: center;
-      font-size: 12px;
-      color: #F5D5E0;
-      opacity: 0.8;
+      font-size: 0.78rem;
+      background: rgba(15, 16, 20, 0.62);
+      border: 1px dashed rgba(255, 255, 255, 0.22);
+      padding: 7px 11px;
+      border-radius: 999px;
+      color: rgba(244, 248, 255, 0.86);
     }
 
     .typing-indicator {
-      font-size: 12px;
-      color: #F5D5E0;
-      padding: 5px 15px;
+      min-height: 20px;
       display: none;
+      align-items: center;
+      padding: 0 20px 11px;
+      font-size: 0.8rem;
+      color: rgba(244, 248, 255, 0.8);
+      background: rgba(8, 12, 22, 0.72);
+      border-top: 1px solid var(--line-color);
     }
 
     .input-area {
-      display: flex;
-      padding: 10px;
-      background: #210635;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 14px;
+      background: rgba(8, 12, 24, 0.94);
+      border-top: 1px solid var(--line-color);
     }
 
-    .input-area input {
-      flex: 1;
-      padding: 10px;
-      border-radius: 15px;
-      border: none;
+    .message-input {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--spidey-white);
+      border-radius: 14px;
+      padding: 12px 14px;
       outline: none;
+      font-size: 0.95rem;
     }
 
-    .input-area button {
-      margin-left: 10px;
-      padding: 10px 15px;
-      border-radius: 15px;
+    .message-input:focus {
+      border-color: rgba(215, 25, 33, 0.82);
+      box-shadow: 0 0 0 3px rgba(215, 25, 33, 0.24);
+    }
+
+    .send-btn {
       border: none;
-      background: #7B337E;
-      color: white;
+      border-radius: 14px;
+      padding: 0 18px;
+      min-width: 96px;
+      background: linear-gradient(90deg, var(--spidey-red), var(--spidey-red-dark));
+      color: var(--spidey-white);
+      font-weight: 700;
       cursor: pointer;
-      transition: 0.2s;
+      transition: filter 0.2s ease, transform 0.2s ease;
     }
 
-    .input-area button:hover {
-      background: #6667AB;
+    .send-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+    }
+
+    @media (max-width: 680px) {
+      .chat-shell {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+      }
+
+      .message {
+        max-width: 86%;
+      }
+
+      .header {
+        padding: 14px;
+      }
     }
   </style>
 </head>
 
 <body>
-
-<div id="usernameModal" style="
-  position: fixed;
-  inset: 0;
-  background: #210635;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-">
-  <div style="
-    background: #420D4B;
-    padding: 30px;
-    border-radius: 15px;
-    text-align: center;
-  ">
-    <h2 style="margin-bottom:15px;">Enter Your Username</h2>
-    <input type="text" id="usernameInput" placeholder="Username" style="
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      margin-bottom: 10px;
-    ">
-    <br>
-    <button id="joinBtn" style="
-      padding: 10px 20px;
-      border-radius: 10px;
-      border: none;
-      background: #7B337E;
-      color: white;
-      cursor: pointer;
-    ">Join Chat</button>
-  </div>
-</div>
-
-
-<div class="chat-container">
-  <div class="header">
-    Realtime Chat
-    <div class="status-dot" id="statusDot"></div>
+  <div id="usernameModal" class="username-modal">
+    <div class="modal-card">
+      <h2>Spider-Chat</h2>
+      <p>Choose your identity and swing into the conversation.</p>
+      <input type="text" id="usernameInput" class="modal-input" placeholder="Enter your username" maxlength="24" />
+      <button id="joinBtn" class="join-btn">Join Chat</button>
+    </div>
   </div>
 
-  <div class="messages" id="messages"></div>
-  <div class="typing-indicator" id="typingIndicator">User is typing...</div>
+  <div class="chat-shell">
+    <div class="header">
+      <div class="title-wrap">
+        <h1>🕷 Spider-Chat Network</h1>
+        <span>Realtime Neighborhood Channel</span>
+      </div>
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span>Live Link</span>
+      </div>
+    </div>
 
-  <div class="input-area">
-    <input type="text" id="messageInput" placeholder="Type a message..." />
-    <button id="sendBtn">Send</button>
+    <div class="messages" id="messages"></div>
+    <div class="typing-indicator" id="typingIndicator">Someone is typing...</div>
+
+    <div class="input-area">
+      <input type="text" id="messageInput" class="message-input" placeholder="Drop your message..." />
+      <button id="sendBtn" class="send-btn">Send</button>
+    </div>
   </div>
-</div>
 
-<script>
-  const socket = io();
-  socket.on("moderation-warning", (msg) => {
-    addSystemMessage("⚠ " + msg);
-  });
+  <script>
+    const socket = io();
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const typingIndicator = document.getElementById("typingIndicator");
+    const statusDot = document.getElementById("statusDot");
 
+    const usernameModal = document.getElementById("usernameModal");
+    const usernameInput = document.getElementById("usernameInput");
+    const joinBtn = document.getElementById("joinBtn");
 
-  const messages = document.getElementById("messages");
-  const input = document.getElementById("messageInput");
-  const sendBtn = document.getElementById("sendBtn");
-  const typingIndicator = document.getElementById("typingIndicator");
-  const statusDot = document.getElementById("statusDot");
+    let username = "";
+    let typingTimeout;
 
-  const usernameModal = document.getElementById("usernameModal");
-  const usernameInput = document.getElementById("usernameInput");
-  const joinBtn = document.getElementById("joinBtn");
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
-  let username = "";
-  let typingTimeout;
+    function getTime() {
+      const now = new Date();
+      return now.getHours().toString().padStart(2, "0") + ":" +
+             now.getMinutes().toString().padStart(2, "0");
+    }
 
-  function getTime() {
-    const now = new Date();
-    return now.getHours().toString().padStart(2, "0") + ":" +
-           now.getMinutes().toString().padStart(2, "0");
-  }
+    function addMessage(text, type, sender) {
+      const div = document.createElement("div");
+      div.classList.add("message", type);
+      div.innerHTML = `
+        <strong>${escapeHtml(sender)}</strong><br>
+        ${escapeHtml(text)}
+        <div class="timestamp">${getTime()}</div>
+      `;
 
-  function addMessage(text, type, sender) {
-    const div = document.createElement("div");
-    div.classList.add("message", type);
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-    div.innerHTML = `
-      <strong>${sender}</strong><br>
-      ${text}
-      <div class="timestamp">${getTime()}</div>
-    `;
+    function addSystemMessage(text) {
+      const div = document.createElement("div");
+      div.classList.add("system");
+      div.textContent = text;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  }
+    function joinChat() {
+      const name = usernameInput.value.trim();
+      if (!name) return;
 
-  function addSystemMessage(text) {
-    const div = document.createElement("div");
-    div.classList.add("system");
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  }
+      username = name;
+      socket.emit("join", username);
+      usernameModal.style.display = "none";
+      input.focus();
+    }
 
-  joinBtn.addEventListener("click", () => {
-    const name = usernameInput.value.trim();
-    if (!name) return;
+    function sendMessage() {
+      const message = input.value.trim();
+      if (!message) return;
 
-    username = name;
-    socket.emit("join", username);
-
-    usernameModal.style.display = "none";
-  });
-
-  function sendMessage() {
-    const message = input.value.trim();
-    if (!message) return;
-
-    addMessage(message, "sent", username);
-    socket.emit("chat-message", message);
-    socket.emit("stop-typing");
-
-    input.value = "";
-  }
-
-  sendBtn.addEventListener("click", sendMessage);
-
-  input.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") sendMessage();
-  });
-
-  input.addEventListener("input", () => {
-    socket.emit("typing");
-
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
+      addMessage(message, "sent", username);
+      socket.emit("chat-message", message);
       socket.emit("stop-typing");
-    }, 1000);
-  });
+      input.value = "";
+      input.focus();
+    }
 
-  socket.on("chat-message", (data) => {
-    addMessage(data.message, "received", data.username);
-  });
+    joinBtn.addEventListener("click", joinChat);
+    usernameInput.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") joinChat();
+    });
 
-  socket.on("user-joined", (name) => {
-    addSystemMessage(name + " joined the chat");
-  });
+    sendBtn.addEventListener("click", sendMessage);
+    input.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") sendMessage();
+    });
 
-  socket.on("user-left", (name) => {
-    addSystemMessage(name + " left the chat");
-  });
+    input.addEventListener("input", () => {
+      socket.emit("typing");
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        socket.emit("stop-typing");
+      }, 1000);
+    });
 
-  socket.on("typing", (name) => {
-    typingIndicator.textContent = name + " is typing...";
-    typingIndicator.style.display = "block";
-  });
+    socket.on("moderation-warning", (msg) => {
+      addSystemMessage("⚠ " + msg);
+    });
 
-  socket.on("stop-typing", () => {
-    typingIndicator.style.display = "none";
-  });
+    socket.on("chat-message", (data) => {
+      addMessage(data.message, "received", data.username);
+    });
 
-  socket.on("connect", () => {
-    statusDot.style.background = "limegreen";
-  });
+    socket.on("user-joined", (name) => {
+      addSystemMessage(name + " joined the chat");
+    });
 
-  socket.on("disconnect", () => {
-    statusDot.style.background = "red";
-  });
-</script>
+    socket.on("user-left", (name) => {
+      addSystemMessage(name + " left the chat");
+    });
 
+    socket.on("typing", (name) => {
+      typingIndicator.textContent = name + " is typing...";
+      typingIndicator.style.display = "flex";
+    });
+
+    socket.on("stop-typing", () => {
+      typingIndicator.style.display = "none";
+    });
+
+    socket.on("connect", () => {
+      statusDot.style.background = "#5cff98";
+    });
+
+    socket.on("disconnect", () => {
+      statusDot.style.background = "#e31d24";
+    });
+  </script>
 </body>
 </html>

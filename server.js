@@ -13,6 +13,7 @@ const bannedWords = ["spam", "badword", "hack"];
 const RATE_LIMIT = 5;          // max messages
 const RATE_INTERVAL = 5000;    // per 5 seconds
 const MUTE_DURATION = 10000;   // 10 sec mute
+const PORT = Number(process.env.PORT) || 3000;
 
 const userActivity = {};
 
@@ -87,6 +88,16 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3000, () => {
-  console.log("Server running at http://localhost:3000");
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use. Stop the other server process or run with a different PORT.`);
+    process.exit(1);
+  }
+
+  console.error("Server failed to start:", error);
+  process.exit(1);
+});
+
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });
